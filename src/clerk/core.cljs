@@ -122,10 +122,11 @@
    (debounce
     (fn [event]
       (let [scroll-top (get-scroll-top)
-            state {:scroll-top scroll-top}]
-        (.replaceState js/history (clj->js state) (.-title js/document)))
+            state      #js {:scroll-top scroll-top}]
+        (.replaceState js/history state (.-title js/document)))
       nil)
-    200)))
+    150)
+   #js {:passive true}))
 
 
 (defn after-render!
@@ -134,6 +135,7 @@
   []
   (when-let [page-nav-fn (a/poll! deferred-navigation-chan)]
     (page-nav-fn)))
+
 
 
 (defn navigate-page!
@@ -148,16 +150,23 @@
    the top element (sometimes needed with those sticky menus at the top of pages.)"
   [url & [top-element-id]]
   (assert (string? url))
-  (let [uri (.parse Uri url)
-        path (.getPath uri)
-        old-path (.getPath (.parse Uri @current-path))
+  (let [uri        (.parse Uri url)
+        old-uri    (.parse Uri @current-path)
+        path       ^js (.getPath uri)
+        old-path   ^js (.getPath old-uri)
         same-page? (= path old-path)
-        fragment (not-empty (.getFragment uri))]
+        ;; query       ^js (.getQuery uri)
+        ;; old-query   ^js (.getQuery old-uri)
+        ;; same-query? (= query old-query)
+        fragment   (not-empty ^js (.getFragment uri))]
+    ;; (.log js/console "CLERK" query old-query same-query?)
+    ;; (set-scroll nil)
     (reset! current-path path)
     (if-let [y (get-history-scroll-top)]
-      (if same-page?
-        (smooth-scroll-to y)
-        (defer-page-navigation! #(scroll-to y)))
+      (defer-page-navigation! #(scroll-to y))
+      ;; (if (and same-page? same-query?)
+      ;;   (smooth-scroll-to y)
+      ;;   (defer-page-navigation! #(scroll-to y)))
       (let [y-translation (if top-element-id (bottom-of-element-with-id top-element-id) 0)]
         (if (and same-page? fragment)
           (let [y (top-of-element-with-id fragment)]
